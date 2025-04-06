@@ -1,5 +1,6 @@
 # ShopCalc
 This is a simple web-based shop calculator running on ESP32. It's intended to serve as a basic calculator for school events to optimize the process of selling products timewise but also to minimize calculation errors occurring quite frequently when performed by head by younger students.
+It's designed in a way that just takes a stock ESP32-Dev and that's it. No need for soldering, additional components and so on!
 
 It is up to you to use this system as is or to adapt it to yout needs. Please respect the license though!
 
@@ -10,6 +11,8 @@ It is up to you to use this system as is or to adapt it to yout needs. Please re
 - When all products are being deleted, program will reset back to default product list that serve as examples. Those examples can be deleted r modified if not wanted
 - Shop page is running on port 80 which is default
 - Configuation Page is running on port 8080. Has to be manually typed into adress in order to access setup page
+- Exremely low powerconsumtion (0,65W on average) for maximum runtime
+- Easy to use with any Powerbank
 
 # Setup
 The system is intended to ron on ESP32-Dev. It uses onboard components only to minimize the requiered technical sklills to almost zero.
@@ -30,6 +33,10 @@ And you're done! As simple as this!
 And you're done! As simple as this!
 
 # Limitations
-- default max. number of products in the shop (not cart) is 50. This is due to EEPROM optimization but can be modified to include more than 50 products in the code by increasing the MAX_PRODUCTS and EEPROM_SIZE
-- default max. character length of product name is 30 due to EEPROM optimization. Can be increased by increasing "char name[30]" in the Product struct and the EEPROM_SIZE
+- Default max. number of products in the shop (not cart) is 50. This is due to EEPROM optimization but can be modified to include more than 50 products in the code by increasing the MAX_PRODUCTS and EEPROM_SIZE
+- Default max. character length of product name is 30 due to EEPROM optimization. Can be increased by increasing "char name[30]" in the Product struct and the EEPROM_SIZE
 - Due to using the onboard components, the WIFI range is limited to about 10m line of sight and about to 3m with walls inbetween. To increase this, expand the system with more powerfull components. 
+
+# Comming soon
+- Additional 3D-Printed case to protect ESP32-Dev running ShopCalc from Shortcurcuits and damage from transport
+- Quickreference to config page on shop page with password so no unauthorized person can edit product page
