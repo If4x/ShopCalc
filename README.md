@@ -14,6 +14,10 @@ It is up to you to use this system as is or to adapt it to yout needs. Please re
 - Exremely low powerconsumtion (0,65W on average) for maximum runtime
 - Easy to use with any Powerbank or powersupply
 - Runs a local network to be independent of network availability at site
+- No matter what system you're running (iOS, Andriod, Linux, ...) this tool will work for you! No need to install apps or so, you just need a browser
+- Keeps track of all sold items for statistical usage
+- Export total sold stock to CSV for statistical usage
+- Option to reset EEPROM save of total sold stock to reset before/after an event so statistics are accurate
 
 # Setup
 The system is intended to ron on ESP32-Dev. It uses onboard components only to minimize the requiered technical sklills to almost zero.
@@ -22,8 +26,9 @@ The system is intended to ron on ESP32-Dev. It uses onboard components only to m
 1) connect ESP32-Dev to computer
 2) Flash main.cpp to ESP32-Dev (recommended using PIO for quick compilation, Arduino IDE works too but slower)
 3) Connect your smartphone to wifi (SSID: Kasse | Password: BitteGeld) Can be modified in the main.cpp code at the beginning of the file
-4) Go to your browser and ytpe 192.168.4.1 into the search bar to access shop page
-5) Go to your browser and type 192.168.4.1:8080 into the search bar to access config page
+4) Go to your browser and ytpe 192.168.4.1:80 into the search bar to access shop page
+5) Go to your browser and type 192.168.4.1:80/sales to go to the overview page of sold products where you can export this for statistical usage
+6) Go to your browser and type 192.168.4.1:8080 into the search bar to access config page
 And you're done! As simple as this!
 
 ## After first Powerup
@@ -31,6 +36,7 @@ And you're done! As simple as this!
 2) Connect to wifi (if not modified, default connection see First Powerup step 3)
 3) Go to your browser and ytpe 192.168.4.1 into the search bar to access shop page
 4) Go to your browser and type 192.168.4.1:8080 into the search bar to access config page
+5) Go to your browser and type 192.168.4.1/sales to go to the overview page of sold products where you can export this for statistical usage
 And you're done! As simple as this!
 
 # Limitations
