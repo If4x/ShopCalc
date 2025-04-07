@@ -19,8 +19,8 @@ const char* password = "BitteGeld"; // Password for WIFI
 WebServer server(80);        // product page
 WebServer configServer(8080); // config page
 
-#define MAX_PRODUCTS 20
-#define EEPROM_SIZE 4096
+#define MAX_PRODUCTS 50 // max number of products in the shop
+#define EEPROM_SIZE 4096 // size of EEPROM in bytes (4kB)
 #define LED_PIN 2  // GPIO der Onboard-LED (meist GPIO 2)
 #define SALES_EEPROM_ADDR 600
 #define EEPROM_PRODUCTS_START 0
@@ -46,7 +46,7 @@ int totalSold[MAX_PRODUCTS]; // cumulative number sold per product
 
 // if EEPROM is empty, default products are loaded
 Product defaultProducts[] = {
-  {"Brezel", 2.00, false, 0},
+  {"Brezel", 2.50, false, 0},
   {"Fanta", 2.50, true, 0},
   {"Cola", 2.50, true, 0},
   {"Spezi", 3.00, true, 0},
@@ -68,36 +68,88 @@ void saveSalesToEEPROM() {
 
 void loadSalesFromEEPROM() {
   for (int i = 0; i < productCount; i++) {
+    // Ensure that the sales count starts at 0 if there's no valid data
     totalSold[i] = EEPROM.readInt(EEPROM_SALES_START + i * sizeof(int));
+    if (totalSold[i] == -1) {
+      totalSold[i] = 0;  // Reset to 0 if EEPROM returns an invalid value
+    }
   }
 }
 
+void printEEPROMData() {
+  Serial.println("EEPROM Data:");
+  for (int i = 0; i < productCount; i++) {
+    Product p;
+    EEPROM.get(i * sizeof(Product), p); // Read product data from EEPROM
+    Serial.print("Product ");
+    Serial.print(i);
+    Serial.print(": Name: ");
+    Serial.print(p.name);
+    Serial.print(", Price: ");
+    Serial.print(p.price);
+    Serial.print(", Quantity: ");
+    Serial.println(p.count);
+  }
+}
 
 // EEPROM management
 // save to EEPROM
 void saveProductsToEEPROM() {
-  EEPROM.write(0, productCount);
-  int addr = 1;
+  // Save the product count first (at the beginning of EEPROM)
+  EEPROM.put(0, productCount);
+
+  // Write the products to EEPROM
   for (int i = 0; i < productCount; i++) {
-    EEPROM.put(addr, products[i]);
-    addr += sizeof(Product);
+    EEPROM.put((i * sizeof(Product)) + sizeof(int), products[i]);
   }
-  EEPROM.commit();
+  EEPROM.commit(); // Commit changes to EEPROM
+  printEEPROMData(); // Print EEPROM data for debugging
 }
 
-// load/read from EEPROM
 void loadProductsFromEEPROM() {
-  productCount = EEPROM.read(0);
-  if (productCount <= 0 || productCount > MAX_PRODUCTS) {
-    productCount = 0;
-    return;
+  EEPROM.begin(EEPROM_SIZE);  // Initialize EEPROM
+
+  // Check if EEPROM is empty by reading the first product name
+  char testName[30] = "";
+  EEPROM.get(sizeof(int), testName);  // Read first product name (skip product count)
+  Serial.print("testName: ");
+  Serial.println(testName);  // Debug output to check if EEPROM is empty
+
+  if (String(testName) == "") {  // EEPROM is empty
+    Serial.println("EEPROM is empty, loading default products.");
+    // Load default products into EEPROM if it's empty
+    for (int i = 0; i < defaultProductCount; i++) {
+      EEPROM.put((i * sizeof(Product)) + sizeof(int), defaultProducts[i]);  // Skip product count location
+    }
+    productCount = defaultProductCount; // Set product count to default product count
+    EEPROM.put(0, productCount); // Store product count at the beginning of EEPROM
+    EEPROM.commit(); // Save to EEPROM
+  } else {
+    EEPROM.get(0, productCount);  // Read product count from the beginning of EEPROM
+    Serial.println("EEPROM is not empty, loading saved products.");
+
+    // Ensure productCount is within bounds to avoid memory overflow
+    if (productCount > MAX_PRODUCTS) {
+      Serial.println("Warning: productCount exceeds max limit, resetting to max.");
+      productCount = MAX_PRODUCTS; // Reset to max products if it exceeds
+    }
+
+    // Load saved products from EEPROM
+    for (int i = 0; i < productCount; i++) {
+      EEPROM.get((i * sizeof(Product)) + sizeof(int), products[i]);  // Skip product count location
+    }
   }
-  int addr = 1;
+}
+
+void handleSellProduct(String productName) {
   for (int i = 0; i < productCount; i++) {
-    EEPROM.get(addr, products[i]);
-    products[i].count = 0; // Zähler zurücksetzen
-    addr += sizeof(Product);
+    if (String(products[i].name) == productName) {
+      products[i].count++; // Increase the sold count
+      saveProductsToEEPROM(); // Save the updated product list
+      break;
+    }
   }
+  // You might want to show some feedback here, e.g., redirect to a confirmation page
 }
 
 // cacluate total price of all products in cart
@@ -180,17 +232,17 @@ void handleResetSales() {
     totalSold[i] = 0; // Reset the total sales for each product
   }
 
-  // Optionally, clear EEPROM or reset any other related variables
-  EEPROM.begin(512); // Make sure EEPROM is initialized
+  // Keine Änderung der Produktdaten im EEPROM, nur Verkaufsdaten zurücksetzen
+  EEPROM.begin(EEPROM_SIZE); // Ensure EEPROM is initialized
   for (int i = 0; i < productCount; i++) {
-    EEPROM.write(i, 0); // Reset EEPROM data for sales
+    EEPROM.writeInt(EEPROM_SALES_START + i * sizeof(int), 0); // Reset sales data, not product data
   }
-  EEPROM.commit(); // Make sure the changes are saved to EEPROM
+  EEPROM.commit(); // Save changes to EEPROM
+  saveSalesToEEPROM(); // Save the reset sales data to EEPROM
 
   // Redirect to the sales overview page after resetting
-  server.sendHeader("Location", "/sales"); // Redirect to the sales  page
+  server.sendHeader("Location", "/sales"); // Redirect to the sales page
   server.send(303); // Send a redirect response
-  // wait for 1 second before restarting
   delay(1000); // Optional delay before restarting
   ESP.restart(); // Restart the ESP32 to apply changes
 }
@@ -434,17 +486,20 @@ void handleAdd() {
   server.send(200, "text/plain", "OK");
 }
 
+// remove product from cart
 void handleRemove() {
   int id = server.arg("id").toInt();
   if (id >= 0 && id < productCount && products[id].count > 0) products[id].count--;
   server.send(200, "text/plain", "OK");
 }
 
+// clear all products in cart
 void handleClear() {
   for (int i = 0; i < productCount; i++) products[i].count = 0;
   server.send(200, "text/plain", "OK");
 }
 
+// submit order to server and save to EEPROM
 void handleSubmit() {
   for (int i = 0; i < productCount; i++) {
     totalSold[i] += products[i].count;
@@ -530,13 +585,26 @@ void handleSaveConfig() {
 // delete product from EEPROM and update product list
 void handleDeleteProduct() {
   int id = configServer.arg("id").toInt();
+
+  // Ensure the ID is within valid range
   if (id >= 0 && id < productCount) {
+    // Shift the products in the array
     for (int i = id; i < productCount - 1; i++) {
       products[i] = products[i + 1];
     }
+
+    // Clear the last product (optional, for cleanup)
+    Product emptyProduct = {};
+    EEPROM.put((productCount - 1) * sizeof(Product) + sizeof(int), emptyProduct);
+
+    // Decrease the product count
     productCount--;
+
+    // Save the updated products and product count to EEPROM
     saveProductsToEEPROM();
   }
+
+  // Send success response to the client
   configServer.send(200, "text/plain", "OK");
 }
 
@@ -555,6 +623,7 @@ void setup() {
 
   loadProductsFromEEPROM();
   if (productCount == 0) {
+    Serial.println("No products found in EEPROM, loading default products. productCount: " + String(productCount));
     for (int i = 0; i < defaultProductCount && i < MAX_PRODUCTS; i++) {
       products[i] = defaultProducts[i];
     }
