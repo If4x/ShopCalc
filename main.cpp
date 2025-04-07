@@ -19,12 +19,15 @@ const char* password = "BitteGeld"; // Password for WIFI
 WebServer server(80);        // product page
 WebServer configServer(8080); // config page
 
-#define MAX_PRODUCTS 50
-#define EEPROM_SIZE 1024
+#define MAX_PRODUCTS 20
+#define EEPROM_SIZE 4096
 #define LED_PIN 2  // GPIO der Onboard-LED (meist GPIO 2)
+#define SALES_EEPROM_ADDR 600
+#define EEPROM_PRODUCTS_START 0
+#define EEPROM_SALES_START 1000
 
 unsigned long previousMillis = 0;
-const long interval = 2000; // blinking interval
+const long interval = 900; // blinking interval
 bool ledOn = false; // state of status led
 
 struct Product {
@@ -32,10 +35,14 @@ struct Product {
   float price; // two decimal places
   bool hasDeposit; // true if product has deposit
   int count; // number of products in cart
+  int sold; // number of products sold (for sales overview)
 };
 
 Product products[MAX_PRODUCTS]; // Array for products
 int productCount = 0;
+
+int totalSold[MAX_PRODUCTS]; // cumulative number sold per product
+
 
 // if EEPROM is empty, default products are loaded
 Product defaultProducts[] = {
@@ -51,6 +58,20 @@ Product defaultProducts[] = {
 };
 
 const int defaultProductCount = sizeof(defaultProducts) / sizeof(defaultProducts[0]);
+
+void saveSalesToEEPROM() {
+  for (int i = 0; i < productCount; i++) {
+    EEPROM.writeInt(EEPROM_SALES_START + i * sizeof(int), totalSold[i]);
+  }
+  EEPROM.commit();
+}
+
+void loadSalesFromEEPROM() {
+  for (int i = 0; i < productCount; i++) {
+    totalSold[i] = EEPROM.readInt(EEPROM_SALES_START + i * sizeof(int));
+  }
+}
+
 
 // EEPROM management
 // save to EEPROM
@@ -98,6 +119,84 @@ float calculateDeposit() {
   return deposit;
 }
 
+
+void handleSalesOverview() {
+  loadSalesFromEEPROM(); // load sales from EEPROM
+  
+  // Start the HTML content
+  String html = "<h1>Verkäufe</h1>";
+  
+  // Create a table for the sales
+  html += "<table border='1'><tr><th>Produkt</th><th>Anzahl</th></tr>";
+  
+  // Loop through the products and add them to the table
+  for (int i = 0; i < productCount; i++) {
+    html += "<tr><td>" + String(products[i].name) + "</td><td>" + String(totalSold[i]) + "</td></tr>";
+  }
+  Serial.print("productCount: ");
+  Serial.println(productCount);
+  for (int i = 0; i < productCount; i++) {
+    Serial.print("Product ");
+    Serial.print(i);
+    Serial.print(": ");
+    Serial.print(products[i].name);
+    Serial.print(" - verkauft: ");
+    Serial.println(totalSold[i]);
+  }
+  
+  // Close the table tag
+  html += "</table>";
+
+  // Add the export CSV button
+  html += "<form action='/exportSales' method='post'><button type='submit'>Exportiere Verkäufe als CSV</button></form>";
+
+  // Add the reset sales button
+  html += "<form action='/resetSales' method='post'><button type='submit'>Verkäufe zurücksetzen</button></form>";
+
+  // Set the Content-Type header to UTF-8
+  server.sendHeader("Content-Type", "text/html; charset=UTF-8");
+  
+  // Send the HTML response
+  server.send(200, "text/html", html);
+}
+
+
+// Endpoint to handle CSV export
+void handleExportSales() {
+  String csvData = "Produkt,Anzahl\n";
+  for (int i = 0; i < productCount; i++) {
+    csvData += String(products[i].name) + "," + String(totalSold[i]) + "\n";
+  }
+  
+  server.sendHeader("Content-Disposition", "attachment; filename=sales.csv");
+  server.sendHeader("Content-Type", "text/csv");
+  server.send(200, "text/csv", csvData);
+}
+
+// Endpoint to handle sales reset
+void handleResetSales() {
+  // Reset the sales data, you can clear the totalSold array or reset EEPROM data here
+  for (int i = 0; i < productCount; i++) {
+    totalSold[i] = 0; // Reset the total sales for each product
+  }
+
+  // Optionally, clear EEPROM or reset any other related variables
+  EEPROM.begin(512); // Make sure EEPROM is initialized
+  for (int i = 0; i < productCount; i++) {
+    EEPROM.write(i, 0); // Reset EEPROM data for sales
+  }
+  EEPROM.commit(); // Make sure the changes are saved to EEPROM
+
+  // Redirect to the sales overview page after resetting
+  server.sendHeader("Location", "/sales"); // Redirect to the sales  page
+  server.send(303); // Send a redirect response
+  // wait for 1 second before restarting
+  delay(1000); // Optional delay before restarting
+  ESP.restart(); // Restart the ESP32 to apply changes
+}
+
+
+
 // HTML for product page
 String generateProductList() {
   String content = "";
@@ -128,6 +227,7 @@ String generateProductList() {
   content += "<h3>Gesamtpreis: " + String(calculateTotal(), 2) + " €<br>";
   content += "<small>(inkl. " + String(calculateDeposit(), 2) + " € Pfand)</small></h3>";
   content += "<button onclick='sendAction(\"clear\", -1)'>Warenkorb löschen</button>";
+
   return content;
 }
 
@@ -230,6 +330,7 @@ String generateConfigPage() {
 // Port 80 product page
 void handleRoot() {
   // HTML template for the product page
+  loadSalesFromEEPROM(); // load sales from EEPROM
   String html = R"rawliteral(
   <!DOCTYPE html>
   <html>
@@ -344,6 +445,20 @@ void handleClear() {
   server.send(200, "text/plain", "OK");
 }
 
+void handleSubmit() {
+  for (int i = 0; i < productCount; i++) {
+    totalSold[i] += products[i].count;
+    products[i].count = 0;
+  }
+  saveSalesToEEPROM();
+  server.send(200, "text/plain", "OK");
+
+  // Verkäufe aktualisieren (already handled above)
+
+  saveSalesToEEPROM(); // Deine Funktion zum Speichern der Verkäufe
+}
+
+
 // update content of product page when action was performed by client (add, remove, clear)
 void handleContent() {
   String content = "";
@@ -364,13 +479,23 @@ void handleContent() {
 
   content += "<h3>Gesamtpreis: " + String(calculateTotal(), 2) + " €<br>";
   content += "<small>(inkl. " + String(calculateDeposit(), 2) + " € Pfand)</small></h3>";
-  content += "<button class='clear-button' onclick='sendAction(\"clear\", -1)'>Warenkorb löschen</button>";
+  // submit button to finalize the order and send it to the server to be saved to EEPROM
+  content += "<button onclick='sendAction(\"submit\", -1)' style='background-color: blue; color: white; width: 100%; padding: 15px; font-size: 1.2em; margin-top: 10px;'>Bestellung abschließen</button>";
+
+  // clear button to clear the cart
+  content += "<div style='text-align: center; margin-top: 10px;'>";
+  content += "<button class='clear-button' onclick='sendAction(\"clear\", -1)' style='padding: 8px 16px; font-size: 1em;'>Warenkorb löschen</button>";
+  content += "</div>";
+
   content +="<footer style='text-align: center; margin-top: 20px; font-size: 12px; color: #888;'>";
   content += "&copy; 2025 Imanuel Fehse | Alle Rechte vorbehalten.";
   content += "</footer>";
 
   server.send(200, "text/html", content);
 }
+
+
+
 
 
 // Port 8080 configuration page
@@ -435,7 +560,11 @@ void setup() {
     }
     productCount = defaultProductCount;
     saveProductsToEEPROM();
+    saveSalesToEEPROM();  // Verkäufe auch initialisieren
   }
+
+  loadSalesFromEEPROM(); // Beispiel-Funktion, die du schreiben musst
+
 
   // Port 80
   server.on("/", handleRoot);
@@ -443,6 +572,17 @@ void setup() {
   server.on("/remove", handleRemove);
   server.on("/clear", handleClear);
   server.on("/content", handleContent);
+  server.on("/submit", handleSubmit);
+  server.on("/sales", handleSalesOverview);
+  server.on("/resetSales", HTTP_POST, handleResetSales);
+  server.on("/exportSales", HTTP_POST, handleExportSales);
+  server.onNotFound([]() {
+    server.send(404, "text/plain", "404 Not Found");
+  });
+
+  
+  
+
 
   // Port 8080
   configServer.on("/", handleConfig);
