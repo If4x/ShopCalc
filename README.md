@@ -47,4 +47,3 @@ And you're done! As simple as this!
 # Comming soon
 - Additional 3D-Printed case to protect ESP32-Dev running ShopCalc from Shortcurcuits and damage from transport
 - Quickreference to config page on shop page with password so no unauthorized person can edit product page
-- Order submit to save order to EEPROM for overview of sold articles for an event
