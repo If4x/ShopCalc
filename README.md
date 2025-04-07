@@ -12,7 +12,8 @@ It is up to you to use this system as is or to adapt it to yout needs. Please re
 - Shop page is running on port 80 which is default
 - Configuation Page is running on port 8080. Has to be manually typed into adress in order to access setup page
 - Exremely low powerconsumtion (0,65W on average) for maximum runtime
-- Easy to use with any Powerbank
+- Easy to use with any Powerbank or powersupply
+- Runs a local network to be independent of network availability at site
 
 # Setup
 The system is intended to ron on ESP32-Dev. It uses onboard components only to minimize the requiered technical sklills to almost zero.
@@ -40,3 +41,4 @@ And you're done! As simple as this!
 # Comming soon
 - Additional 3D-Printed case to protect ESP32-Dev running ShopCalc from Shortcurcuits and damage from transport
 - Quickreference to config page on shop page with password so no unauthorized person can edit product page
+- Order submit to save order to EEPROM for overview of sold articles for an event
