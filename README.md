@@ -19,6 +19,9 @@ It is up to you to use this system as is or to adapt it to yout needs. Please re
 - Export total sold stock to CSV for statistical usage
 - Option to reset EEPROM save of total sold stock to reset before/after an event so statistics are accurate
 
+## Additional 3D-printed case
+There are STL files for an additional ESP case that has buttons for EN abd BOOT to be able to restart the ESP32. It also has "air vents" for the Processor due to heat generation caused by using the WIFI module actively.
+
 # Setup
 The system is intended to ron on ESP32-Dev. It uses onboard components only to minimize the requiered technical sklills to almost zero.
 
@@ -45,5 +48,4 @@ And you're done! As simple as this!
 - Due to using the onboard components, the WIFI range is limited to about 10m line of sight and about to 3m with walls inbetween. To increase this, expand the system with more powerfull components. 
 
 # Comming soon
-- Additional 3D-Printed case to protect ESP32-Dev running ShopCalc from Shortcurcuits and damage from transport
 - Quickreference to config page on shop page with password so no unauthorized person can edit product page
